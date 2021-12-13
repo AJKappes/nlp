@@ -68,7 +68,7 @@ pols_df = pd.DataFrame.from_records(pols)
 scores_df = pd.concat([op_df, pols_df], axis=1)
 
 # compound value [-1, 1] [neg, pos] 'sensationalism'
-# threshold abs(2)
+# threshold abs(.2)
 cutoff = .2
 com_cond = [(scores_df['compound'] < -cutoff),
             (scores_df['compound'] > -cutoff) & (scores_df['compound'] < cutoff),
