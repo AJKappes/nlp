@@ -7,14 +7,19 @@ import nltk
 # from nltk.sentiment.vader import SentimentIntensityAnalyzer
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
+from nltk.tokenize import sent_tokenize
 from nltk import ngrams
 from nltk.cluster.util import cosine_distance
 import networkx as nx
 from collections import Counter
+from gensim.models import Word2Vec
+from sklearn.cluster import KMeans
+from scipy.spatial import distance
 # si = SentimentIntensityAnalyzer()
 stop_words = stopwords.words('english')
 new_words = ['uh', 'um', 'yeah', 'yes', 'gon', 'na', 'ca', 'n\'t',
-             'i', 'meeting', 'today', 'okay']
+             'i', 'meeting', 'today', 'okay', 'uh,', 'hi', 'hello',
+             'bye']
 for w in new_words:
     stop_words.append(w)
 
@@ -65,16 +70,16 @@ def process_file(file):
     
     return {'names': names, 'timestamp': timestamp, 'talk': talk_cleaned}
 
-def get_summary(transcript_sentences, summary_n):
+def get_summary_textrank(transcript, summary_n):
     # function builds extractive summary
     #    top n sentences based on textrank
     #    scores computed through sentence cosine distance similiraity matrix
     
     # args:
-    #    transcript_sentences, list of meeting sentences (text)
+    #    transcript_sentences, list of meeting text
     #    summary_n, the number of sentences to build the summary
     
-    s_trans = transcript_sentences
+    s_trans = transcript
     
     # sentence similarity (cosine distance)
     print('Computing sentence similarity')
@@ -129,6 +134,71 @@ def get_summary(transcript_sentences, summary_n):
     print(str(summary_n) + ' line summary extracted')
     
     return text_summary
+
+def get_summary_kmeans(transcript, summary_n):
+    # function builds summary through K means clustering
+    #  built through word2vec embeddings mapped to sentence vectors
+    #  sentence vectors then used to build clusters and extract summary
+    
+    # args:
+    #    transcript_sentences, list of speaker text
+    #    summary_n, the number of sentences to build the summary
+    
+    meeting_text = ' '.join(transcript)
+    sentences = [s.lower() for s in sent_tokenize(meeting_text)]
+    pre_convo = []
+
+    for sentence in sentences:
+        pre = re.sub(r'[^a-z]', ' ', sentence)
+        words = pre.split()
+        keep_words = [w for w in words if w not in stop_words]
+        new_sen = ' '.join(keep_words)
+        pre_convo.append(new_sen)
+
+    content_idx = []
+    for i in range(len(pre_convo)):
+        if pre_convo[i] != '':
+            content_idx.append(i)
+
+    sentence_extract = [sentences[i] for i in content_idx]
+    clean_convo = [sen for sen in pre_convo if re.search(r'[a-z]', sen)]
+    convo_embed = [i.split() for i in clean_convo]
+    embed_dim = max([len(i) for i in convo_embed]) + 1
+    embed_model = Word2Vec(convo_embed, min_count = 1, vector_size = embed_dim)
+
+    # averaged word2vec for sentence embedding
+    sentence_embed = []
+    for sentence in convo_embed:
+
+        summed = 0
+        for w in sentence:
+            summed += embed_model.wv[w]
+
+        s_embed = summed/len(sentence)
+        sentence_embed.append(s_embed)
+
+    kmeans = KMeans(summary_n, random_state = 1)
+    kmeans_fit = kmeans.fit_predict(sentence_embed)
+
+    sentence_idx = []
+    for c in range(summary_n):
+
+        idx = np.where(kmeans_fit == c)[0].tolist()
+        distances = []
+        for i in idx:
+            d = distance.euclidean(kmeans.cluster_centers_[c], sentence_embed[i])
+            distances.append(d)
+
+        #dsort = sorted(distances)[:2]
+        #didx = [distances.index(d) for d in dsort]
+        #sentence_idx.append([d for d in didx])
+        didx = distances.index(min(distances))
+        sentence_idx.append(didx)
+    
+    sentence_summary = [sentence_extract[i] for i in sentence_idx]
+    summary = ' '.join(sentence_summary)
+
+    return summary
 
 def get_word_freqs(talk_text):
     # function computes n-gram word frequencies
@@ -228,7 +298,7 @@ plt.show()
 
 
 # summary based on ALL meeting speaers
-speakers_all_summary = get_summary(talk, 2)
+speakers_all_summary = get_summary_textrank(talk, 2)
 
 # summary based on MOST involved speakers
 df = get_speaker_info()['df']
@@ -238,7 +308,13 @@ for r in sort_rates:
     summary_speakers.append(speakers[rates.index(r)])
 
 sub_talk = df.loc[df['speaker'].isin(summary_speakers), 'text'].tolist()
-speakers_most_summary = get_summary(sub_talk, 2)
+speakers_most_summary = get_summary_textrank(sub_talk, 2)
+
+# summary based on K means clustering
+kmeans_summary = get_summary_kmeans(talk, 4)
 
 print('All speaker summary:\n\n  ', speakers_all_summary, '\n\n',
-      'Most speaker summary:\n\n  ', speakers_most_summary)
+      'Most speaker summary:\n\n  ', speakers_most_summary, '\n\n',
+      'K means summary:\n\n  ', kmeans_summary)
+
+
