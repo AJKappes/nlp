@@ -76,7 +76,7 @@ def get_summary_textrank(transcript, summary_n):
     #    scores computed through sentence cosine distance similiraity matrix
     
     # args:
-    #    transcript_sentences, list of meeting text
+    #    transcript, list of meeting text
     #    summary_n, the number of sentences to build the summary
     
     s_trans = transcript
@@ -141,7 +141,7 @@ def get_summary_kmeans(transcript, summary_n):
     #  sentence vectors then used to build clusters and extract summary
     
     # args:
-    #    transcript_sentences, list of speaker text
+    #    transcript, list of meeting text
     #    summary_n, the number of sentences to build the summary
     
     meeting_text = ' '.join(transcript)
@@ -200,13 +200,13 @@ def get_summary_kmeans(transcript, summary_n):
 
     return summary
 
-def get_word_freqs(talk_text):
+def get_word_freqs(transcript):
     # function computes n-gram word frequencies
     
     # args:
-    #    talk_text, list of meeting text
+    #    transcript, list of meeting text
     
-    meeting_text = ' '.join(talk_text)
+    meeting_text = ' '.join(transcript)
     tokens = [w.lower() for w in word_tokenize(meeting_text)]
     words = [w for w in tokens if w not in stop_words]
     cleaned = [w for w in words if re.search(r'^[a-z]', w)]
