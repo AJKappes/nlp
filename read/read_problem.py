@@ -40,9 +40,14 @@ for w in new_words:
 
 
 sub_path = glob.glob('/home/alex/pyenv/nlp/read/Recruiting/*.txt')
-t_path = [t for t in sub_path if re.search(r'Product', t)][0]
-raw_file = open(t_path, 'r').readlines()
+product_path = [t for t in sub_path if re.search(r'Product', t)][0]
+tips_path = [t for t in sub_path if re.search(r'Tips', t)][0]
 
+with open(product_path, 'r') as product:
+    product_raw_file = product.readlines()
+
+with open(tips_path, 'r') as tips:
+    tips_raw_file = tips.readlines()
 
 ######## helper functions ########
 
@@ -51,14 +56,14 @@ def process_file(file):
     # function processes file columns into distinct lists for analysis
     
     # args:
-    #    meeting transcipt file
+    #    file, meeting transcipt file
     
     names = []
     timestamp = []
     talk = []
     for i in file:
-        if re.search(r'^.*[A-Za-z](?=:)', i):
-            names.append(re.search(r'^.*[A-Za-z](?=:)', i)[0])
+        if re.search(r'^.*([A-Za-z]|Speaker [0-9])(?=:)', i):
+            names.append(re.search(r'^.*([A-Za-z]|Speaker [0-9])(?=:)', i)[0])
 
         if re.search(r'\d+:\d+', i):
             timestamp.append(re.search(r'\d+:\d+', i)[0])
@@ -222,9 +227,16 @@ def get_word_freqs(transcript):
 
 # speaker rate summary
 
-def get_speaker_info():
+def get_speaker_info(file):
     # function provides speaker and speaker rate information
     #  also provided is a dataframe with all above information
+    
+    # args:
+    #    file, meeting transcript file
+    
+    f = process_file(file)
+    names = f['names']
+    talk = f['talk']
     
     df = pd.DataFrame({'speaker': names, 'text': talk})
     speakers = df['speaker'].unique().tolist()
@@ -242,12 +254,12 @@ def get_speaker_info():
 ######## data vis ########
 
 
-processed_file = process_file(raw_file)
-talk = processed_file['talk']
-names = processed_file['names']
+processed_file_product = process_file(product_raw_file)
+talk_product = processed_file_product['talk']
+names_product = processed_file_product['names']
 
 # n-gram vis
-word_freqs = get_word_freqs(talk)
+word_freqs = get_word_freqs(talk_product)
 grams = ['2', '4', '5']
 ydata = []
 xdata = []
@@ -276,13 +288,13 @@ plt.subplots_adjust(hspace = .5)
 plt.show()
 
 # speaker rate vis
-speakers = get_speaker_info()['speakers']
-rates = get_speaker_info()['rates']
+speakers_product = get_speaker_info(product_raw_file)['speakers']
+rates_product = get_speaker_info(product_raw_file)['rates']
 colors = ['#38387b', '#58b6ba', '#ccf7c7',
           '#edd752', '#ec912e', '#ec322e']
 
 fig, ax = plt.subplots()
-ax.pie(rates, colors = colors, labels = speakers,
+ax.pie(rates_product, colors = colors, labels = speakers_product,
        autopct = '%1.1f%%', startangle = 90)
 
 center_cir = plt.Circle((0,0), .85, fc = 'white')
@@ -296,25 +308,51 @@ plt.show()
 
 ######## meeting summary ########
 
+# product meeting
 
 # summary based on ALL meeting speaers
-speakers_all_summary = get_summary_textrank(talk, 2)
+speakers_all_summary = get_summary_textrank(talk_product, 2)
 
 # summary based on MOST involved speakers
-df = get_speaker_info()['df']
-sort_rates = sorted(rates, reverse = True)[:2]
+df_product = get_speaker_info(product_raw_file)['df']
+sort_rates = sorted(rates_product, reverse = True)[:2]
 summary_speakers = []
 for r in sort_rates:
-    summary_speakers.append(speakers[rates.index(r)])
+    summary_speakers.append(speakers_product[rates_product.index(r)])
 
-sub_talk = df.loc[df['speaker'].isin(summary_speakers), 'text'].tolist()
-speakers_most_summary = get_summary_textrank(sub_talk, 2)
+sub_talk_product = df_product.loc[df_product['speaker'].isin(summary_speakers),
+                                  'text'].tolist()
+
+speakers_most_summary = get_summary_textrank(sub_talk_product, 2)
 
 # summary based on K means clustering
-kmeans_summary = get_summary_kmeans(talk, 4)
+kmeans_summary = get_summary_kmeans(talk_product, 4)
 
 print('All speaker summary:\n\n  ', speakers_all_summary, '\n\n',
       'Most speaker summary:\n\n  ', speakers_most_summary, '\n\n',
       'K means summary:\n\n  ', kmeans_summary)
 
+# tips meeting
 
+# summary based on ALL meeting speaers
+talk_tips = process_file(tips_raw_file)['talk']
+talk_summary_textrank = get_summary_textrank(talk_tips, 2)
+
+tips_info = get_speaker_info(tips_raw_file)
+df_tips = tips_info['df']
+rates_tips = tips_info['rates']
+speakers_tips = tips_info['speakers']
+
+# summary based on MOST involved speakers
+tips_sort_rates = sorted(rates_tips, reverse = True)[:3]
+tips_summary_speakers = []
+for r in tips_sort_rates:
+    tips_summary_speakers.append(speakers_tips[rates_tips.index(r)])
+
+sub_talk_tips = df_tips.loc[df_tips['speaker'].isin(tips_summary_speakers),
+                            'text'].tolist()
+
+talk_summary_textrank_most = get_summary_textrank(sub_talk_tips, 2)
+
+# summary based on K means clustering
+talk_summary_kmeans = get_summary_kmeans(talk_tips, 4)
