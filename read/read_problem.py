@@ -18,8 +18,8 @@ from scipy.spatial import distance
 # si = SentimentIntensityAnalyzer()
 stop_words = stopwords.words('english')
 new_words = ['uh', 'um', 'yeah', 'yes', 'gon', 'na', 'ca', 'n\'t',
-             'i', 'meeting', 'today', 'okay', 'uh,', 'hi', 'hello',
-             'bye']
+             'i', 'meeting', 'today', 'okay', 'hi', 'hello', 'like',
+             'think', 'great', 'bye', 'agree', 'could']
 for w in new_words:
     stop_words.append(w)
 
@@ -356,3 +356,23 @@ talk_summary_textrank_most = get_summary_textrank(sub_talk_tips, 2)
 
 # summary based on K means clustering
 talk_summary_kmeans = get_summary_kmeans(talk_tips, 4)
+
+# keep improving
+
+sent_talk = sent_tokenize(speakers_all_summary)
+
+clean = []
+for s in sent_talk:
+    s_low = [w for w in word_tokenize(s.lower()) if w.isalnum()]
+    no_fill = [w for w in s_low if w not in stop_words]
+    clean.append(' '.join(no_fill))
+
+summary = []
+for s in clean:
+    if re.search(r'^[a-z].*', s):
+        summary.append(re.search(r'^[a-z].*', s)[0])
+
+for s in summary:
+    print(s + '\n')
+
+
